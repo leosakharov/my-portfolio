@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import ambientAudio from '../assets/audio/NLK.mp3';
+import ambientAudio from '../assets/audio/Usca_1.mp3';
 
 const CanvasComponent = () => {
     const canvasRef = useRef(null);
@@ -33,7 +33,7 @@ const CanvasComponent = () => {
             }
             
             // Clear canvas with background color
-            playCtx.fillStyle = '#f8f8f0';
+            playCtx.fillStyle = '#f5f5f5';
             playCtx.fillRect(0, 0, size, size);
             
             // Draw circle
@@ -140,8 +140,8 @@ const CanvasComponent = () => {
         let lastTouchY = null;
         let touchActive = false;
 
-        // Set background color to off-white
-        ctx.fillStyle = '#f8f8f0';
+        // Set background color to light gray
+        ctx.fillStyle = '#f5f5f5';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         // Add signature in bottom left corner on initial load with responsive font size
@@ -168,8 +168,8 @@ const CanvasComponent = () => {
         let centerX = canvas.width / 2;
         let centerY = canvas.height / 2;
         
-        // Line style - pen-like appearance
-        ctx.strokeStyle = '#222222'; // Black pen color
+        // Line style - black pen-like appearance
+        ctx.strokeStyle = '#222222';
         ctx.lineWidth = 1.5;
         ctx.lineJoin = 'round';
         ctx.lineCap = 'round';
@@ -180,7 +180,7 @@ const CanvasComponent = () => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
             
-            ctx.fillStyle = '#f8f8f0';
+            ctx.fillStyle = '#f5f5f5';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
                         
             // Reset drawing style after resize
@@ -356,12 +356,39 @@ const CanvasComponent = () => {
                 return;
             }
             
+            // Set up grid parameters for structured drawing
+            const gridSize = Math.min(canvas.width, canvas.height) / 4;
+            const gridRows = Math.ceil(canvas.height / gridSize);
+            const gridCols = Math.ceil(canvas.width / gridSize);
+            
+            // Create grid cells with slight randomness
+            const gridCells = [];
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    // Add some randomness to grid cell positions
+                    const jitterX = (Math.random() - 0.5) * (gridSize * 0.2);
+                    const jitterY = (Math.random() - 0.5) * (gridSize * 0.2);
+                    
+                    gridCells.push({
+                        x: col * gridSize + jitterX,
+                        y: row * gridSize + jitterY,
+                        width: gridSize + (Math.random() - 0.5) * (gridSize * 0.1),
+                        height: gridSize + (Math.random() - 0.5) * (gridSize * 0.1),
+                        active: false,
+                        fillChance: Math.random(),
+                        lastActive: 0
+                    });
+                }
+            }
+            
             // Set up a single control point for the pen-like drawing
             let penPosition = {
                 x: canvas.width / 2,
                 y: canvas.height / 2,
                 prevX: canvas.width / 2,
-                prevY: canvas.height / 2
+                prevY: canvas.height / 2,
+                gridX: Math.floor(canvas.width / 2 / gridSize),
+                gridY: Math.floor(canvas.height / 2 / gridSize)
             };
             
             // Function to get average amplitude in a frequency range
@@ -379,9 +406,11 @@ const CanvasComponent = () => {
             // Add noise factors that change over time
             let noiseFactor = 1.0;
             let noiseChangeRate = 0.5 + Math.random() * 0.5; // How quickly noise changes
-            let noiseDirection = 1; // Whether noise is increasing or decreasing
             let noiseChangeTimer = 0; // Timer for noise changes
             let nextNoiseTarget = 0.5 + Math.random() * 1.5; // Target noise level
+            
+            // Track filled areas
+            const filledAreas = [];
             
             // Set up the drawing function that uses audio data
             function draw() {
@@ -411,41 +440,54 @@ const CanvasComponent = () => {
                 analyser.getByteFrequencyData(dataArray);
                 
                 // Analyze different frequency ranges for more musical responsiveness
-                // Adjusted frequency ranges for better sensitivity
                 const bassRange = getAverageAmplitude(dataArray, 0, 10) / 255;
                 const midRange = getAverageAmplitude(dataArray, 10, 100) / 255;
                 const highRange = getAverageAmplitude(dataArray, 100, 200) / 255;
                 
-                // Overall energy of the music - increased weight on mid and high frequencies for more reactivity
+                // Overall energy of the music
                 const musicEnergy = (bassRange * 3 + midRange * 2.5 + highRange * 1.5);
                 
                 // Save previous position
                 penPosition.prevX = penPosition.x;
                 penPosition.prevY = penPosition.y;
                 
-                // Calculate new position with smoother movement
-                // Use perlin-like noise influenced by music for organic movement
-                const angle = Date.now() * 0.01 * (0.1 + musicEnergy * 0.3); // Increased music influence
-                const radius = 0.5 + musicEnergy * 3; // Increased radius for more reactivity
+                // Calculate new position with grid-like movement
+                // Decide whether to move horizontally or vertically with some randomness
+                const moveHorizontal = Math.random() < 0.5;
                 
-                // Move the pen position with more responsiveness to music
-                penPosition.x += Math.cos(angle) * radius * deltaTime * 20;
-                penPosition.y += Math.sin(angle) * radius * deltaTime * 20;
+                if (moveHorizontal) {
+                    // Move horizontally with some randomness
+                    const direction = Math.random() < 0.5 ? -1 : 1;
+                    penPosition.x += direction * (10 + musicEnergy * 20) * deltaTime * 20;
+                } else {
+                    // Move vertically with some randomness
+                    const direction = Math.random() < 0.5 ? -1 : 1;
+                    penPosition.y += direction * (10 + musicEnergy * 20) * deltaTime * 20;
+                }
                 
-                // Add random influence scaled by the dynamic noise factor
-                // Scale random movement by bass energy and current noise factor
-                // Using (Math.random() - 0.5) to allow movement in both directions
+                // Add some random influence for organic feel
                 penPosition.x += (Math.random() - 0.5) * 2 * bassRange * noiseFactor;
                 penPosition.y += (Math.random() - 0.5) * 2 * bassRange * noiseFactor;
                 
-                // Keep the pen within canvas bounds with smoother edge handling
+                // Keep the pen within canvas bounds
                 if (penPosition.x < 0) penPosition.x = 2;
                 if (penPosition.x > canvas.width) penPosition.x = canvas.width - 2;
                 if (penPosition.y < 0) penPosition.y = 2;
                 if (penPosition.y > canvas.height) penPosition.y = canvas.height - 2;
                 
+                // Update grid position
+                penPosition.gridX = Math.floor(penPosition.x / gridSize);
+                penPosition.gridY = Math.floor(penPosition.y / gridSize);
+                
+                // Find current grid cell index
+                const currentCellIndex = penPosition.gridY * gridCols + penPosition.gridX;
+                if (currentCellIndex >= 0 && currentCellIndex < gridCells.length) {
+                    // Mark cell as active
+                    gridCells[currentCellIndex].active = true;
+                    gridCells[currentCellIndex].lastActive = currentTime;
+                }
+                
                 // Only draw if the pen has moved a minimum distance
-                // This creates a more deliberate, slower drawing
                 const distance = Math.sqrt(
                     Math.pow(penPosition.x - penPosition.prevX, 2) + 
                     Math.pow(penPosition.y - penPosition.prevY, 2)
@@ -454,63 +496,151 @@ const CanvasComponent = () => {
                 if (distance > 0.2) {
                     // Set up line style for a pen-like appearance
                     ctx.strokeStyle = '#222222'; // Black pen color
-                    ctx.lineWidth = 1.5 + bassRange * 1.5; // Increased thickness variation for more reactivity
+                    
+                    // Vary line width based on music energy and randomness
+                    // Sometimes very thin, sometimes thicker
+                    const lineWidthVariation = Math.random() < 0.7 ? 0.5 : 1.5 + bassRange * 2;
+                    ctx.lineWidth = lineWidthVariation;
+                    
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
                     
-                    // Set opacity based on music energy - more reactive to audio
-                    ctx.globalAlpha = 0.6 + musicEnergy * 0.4; // Increased reactivity
+                    // Set opacity based on music energy
+                    ctx.globalAlpha = 0.7 + musicEnergy * 0.3;
                     
-                    // Rarely draw a straight line in a random direction
-                    // Low chance, with slight music energy influence
-                    const straightLineChance = 0.0002 + (musicEnergy * 0.0005);
+                    // Decide whether to draw a straight line or a curve
+                    // Higher chance of straight lines to match the grid-like structure
+                    const straightLineChance = 0.7 + (musicEnergy * 0.1);
                     
                     if (Math.random() < straightLineChance) {
-                        // Save current position
-                        const startX = penPosition.x;
-                        const startY = penPosition.y;
-                        
-                        // Calculate a random angle and length for the straight line
-                        const straightLineAngle = Math.random() * Math.PI * 2;
-                        const straightLineLength = 20 + Math.random() * 80 * (1 + musicEnergy);
-                        
-                        // Calculate end point of straight line
-                        const endX = startX + Math.cos(straightLineAngle) * straightLineLength;
-                        const endY = startY + Math.sin(straightLineAngle) * straightLineLength;
-                        
-                        // Draw the straight line
+                        // Draw a straight line
                         ctx.beginPath();
-                        ctx.moveTo(startX, startY);
-                        ctx.lineTo(endX, endY);
+                        ctx.moveTo(penPosition.prevX, penPosition.prevY);
+                        ctx.lineTo(penPosition.x, penPosition.y);
                         ctx.stroke();
-                        
-                        // Update pen position to the end of the straight line
-                        penPosition.prevX = penPosition.x;
-                        penPosition.prevY = penPosition.y;
-                        penPosition.x = endX;
-                        penPosition.y = endY;
                     } else {
-                        // Draw a line from previous position to current
+                        // Draw a curved line
                         ctx.beginPath();
                         ctx.moveTo(penPosition.prevX, penPosition.prevY);
                         
-                        // For a more organic pen-like feel, use a subtle bezier curve
-                        // with dynamic randomness based on the current noise factor
+                        // Control point for the curve
                         const controlX = penPosition.prevX + (penPosition.x - penPosition.prevX) * 0.5 + 
-                            (Math.random() - 0.5) * 0.1 * musicEnergy * noiseFactor;
+                            (Math.random() - 0.5) * 20;
                         const controlY = penPosition.prevY + (penPosition.y - penPosition.prevY) * 0.5 + 
-                            0.1 * musicEnergy * (1 + (Math.random() - 0.5) * noiseFactor * 0.5);
+                            (Math.random() - 0.5) * 20;
+                        
                         ctx.quadraticCurveTo(controlX, controlY, penPosition.x, penPosition.y);
                         ctx.stroke();
                     }
+                    
+                    // Occasionally create filled shapes
+                    if (Math.random() < 0.01 + (musicEnergy * 0.02)) {
+                        // Create a filled shape
+                        const shapeType = Math.random();
+                        
+                        if (shapeType < 0.5) {
+                            // Create a filled rectangle or diamond
+                            const width = 10 + Math.random() * 40;
+                            const height = 10 + Math.random() * 40;
+                            
+                            ctx.fillStyle = '#222222';
+                            ctx.globalAlpha = 0.7 + Math.random() * 0.3;
+                            
+                            if (Math.random() < 0.5) {
+                                // Rectangle
+                                ctx.fillRect(
+                                    penPosition.x - width/2, 
+                                    penPosition.y - height/2, 
+                                    width, 
+                                    height
+                                );
+                            } else {
+                                // Diamond
+                                ctx.beginPath();
+                                ctx.moveTo(penPosition.x, penPosition.y - height/2);
+                                ctx.lineTo(penPosition.x + width/2, penPosition.y);
+                                ctx.lineTo(penPosition.x, penPosition.y + height/2);
+                                ctx.lineTo(penPosition.x - width/2, penPosition.y);
+                                ctx.closePath();
+                                ctx.fill();
+                            }
+                            
+                            // Add to filled areas
+                            filledAreas.push({
+                                x: penPosition.x,
+                                y: penPosition.y,
+                                width: width,
+                                height: height,
+                                type: shapeType < 0.5 ? 'rect' : 'diamond'
+                            });
+                        } else {
+                            // Create an irregular shape
+                            const points = 3 + Math.floor(Math.random() * 4); // 3-6 points
+                            const radius = 10 + Math.random() * 30;
+                            
+                            ctx.fillStyle = '#222222';
+                            ctx.globalAlpha = 0.7 + Math.random() * 0.3;
+                            
+                            ctx.beginPath();
+                            
+                            for (let i = 0; i < points; i++) {
+                                const angle = (i / points) * Math.PI * 2;
+                                const pointRadius = radius * (0.7 + Math.random() * 0.6);
+                                const x = penPosition.x + Math.cos(angle) * pointRadius;
+                                const y = penPosition.y + Math.sin(angle) * pointRadius;
+                                
+                                if (i === 0) {
+                                    ctx.moveTo(x, y);
+                                } else {
+                                    ctx.lineTo(x, y);
+                                }
+                            }
+                            
+                            ctx.closePath();
+                            ctx.fill();
+                            
+                            // Add to filled areas
+                            filledAreas.push({
+                                x: penPosition.x,
+                                y: penPosition.y,
+                                radius: radius,
+                                points: points,
+                                type: 'irregular'
+                            });
+                        }
+                    }
                 }
                 
-                // Draw audio timeline in bottom right corner with responsive width
+                // Occasionally draw grid lines
+                if (Math.random() < 0.0005 + (musicEnergy * 0.001)) {
+                  ctx.strokeStyle = '#222222';
+                  ctx.lineWidth = 0.5 + Math.random() * 1;
+                  ctx.globalAlpha = 0.3 + Math.random() * 0.4;
+                  
+                  // Decide whether to draw horizontal or vertical line
+                  if (Math.random() < 0.5) {
+                  // Horizontal line
+                  const y = Math.random() * canvas.height;
+                  ctx.beginPath();
+                  ctx.moveTo(0, y);
+                  ctx.lineTo(canvas.width, y);
+                  ctx.stroke();
+                  } else {
+                  // Vertical line
+                  const x = Math.random() * canvas.width;
+                  ctx.beginPath();
+                  ctx.moveTo(x, 0);
+                  ctx.lineTo(x, canvas.height);
+                  ctx.stroke();
+                  }
+                }
+                
+                // Draw audio timeline in bottom right corner
                 const isMobileTimeline = window.innerWidth < 768;
-                const timelineWidth = isMobileTimeline ? 120 : 200; // Width of timeline - smaller on mobile
-                const timelineHeight = 2; // Height of timeline
-                const timelinePadding = 20; // Padding from edge
-                const timelineY = canvas.height - timelinePadding - 5; // Y position
+                const timelineWidth = isMobileTimeline ? 120 : 200;
+                const timelineHeight = 2;
+                const timelinePadding = 20;
+                const timelineY = canvas.height - timelinePadding - 5;
                 
                 // Calculate progress
                 const progress = audio.currentTime / audio.duration;
@@ -531,28 +661,6 @@ const CanvasComponent = () => {
                 ctx.moveTo(canvas.width - timelinePadding - timelineWidth, timelineY);
                 ctx.lineTo(canvas.width - timelinePadding - timelineWidth + (timelineWidth * progress), timelineY);
                 ctx.stroke();
-                
-                // Add some noise to the timeline based on current music energy and noise factor
-                // Reduce complexity on mobile
-                const isMobileDevice = window.innerWidth < 768;
-                if (musicEnergy > 0.2) {
-                    const timelineNoiseCount = Math.floor(isMobileDevice ? 
-                        (3 + musicEnergy * 5) : // Fewer noise lines on mobile
-                        (5 + musicEnergy * 10)); // More noise lines on desktop
-                    ctx.globalAlpha = 0.4 * musicEnergy;
-                    ctx.lineWidth = 1;
-                    
-                    for (let i = 0; i < timelineNoiseCount; i++) {
-                        const noiseX = canvas.width - timelinePadding - timelineWidth + 
-                            (Math.random() * timelineWidth * progress);
-                        const noiseY = timelineY + (Math.random() - 0.5) * 6 * noiseFactor;
-                        
-                        ctx.beginPath();
-                        ctx.moveTo(noiseX, timelineY);
-                        ctx.lineTo(noiseX, noiseY);
-                        ctx.stroke();
-                    }
-                }
                 
                 // Keep drawing
                 animationRef.current = requestAnimationFrame(draw);
