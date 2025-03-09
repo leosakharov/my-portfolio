@@ -39,15 +39,10 @@ const CanvasComponent = () => {
         const audio = new Audio(ambientAudio);
         audioRef.current = audio;
         
-        // Mark when audio is loaded, with a fallback timer for iOS
+        // Just mark when audio is loaded
         audio.addEventListener('canplaythrough', () => {
             setAudioLoaded(true);
         }, { once: true });
-        
-        // iOS fallback - ensure audio is considered loaded after 3 seconds
-        setTimeout(() => {
-            setAudioLoaded(true);
-        }, 3000);
 
         // Set up initial parameters
         let centerX = canvas.width / 2;
@@ -150,7 +145,7 @@ const CanvasComponent = () => {
                 audioContextRef.current.close();
             }
         };
-    }, [audioPlaying]); // Added audioPlaying as a dependency
+    }, []);
 
     // Function to start audio and visualization when user clicks play button
     const startAudio = () => {
@@ -400,8 +395,7 @@ const CanvasComponent = () => {
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <canvas ref={canvasRef}></canvas>
-            {/* Always show the play button if audio is not playing, regardless of loaded state */}
-            {!audioPlaying && (
+            {!audioPlaying && audioLoaded && (
                 <div 
                     onClick={startAudio}
                     style={{
@@ -414,8 +408,7 @@ const CanvasComponent = () => {
                         alignItems: 'center',
                         cursor: 'pointer',
                         WebkitTapHighlightColor: 'transparent',
-                        transition: 'all 0.3s ease',
-                        zIndex: 10 // Ensure button is above canvas
+                        transition: 'all 0.3s ease'
                     }}
                 >
                     {/* Play button circle */}
@@ -423,14 +416,18 @@ const CanvasComponent = () => {
                         width: window.innerWidth < 768 ? '80px' : '100px',
                         height: window.innerWidth < 768 ? '80px' : '100px',
                         borderRadius: '50%',
-                        backgroundColor: 'rgba(34, 34, 34, 0.95)',
+                        backgroundColor: 'rgba(34, 34, 34, 0.9)',
                         display: 'flex',
                         justifyContent: 'center',
                         alignItems: 'center',
                         marginBottom: '15px',
                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
                         transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                        transform: 'scale(1)'
+                        transform: 'scale(1)',
+                        ':hover': {
+                            transform: 'scale(1.05)',
+                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)'
+                        }
                     }}>
                         {/* Play triangle */}
                         <div style={{
@@ -453,7 +450,7 @@ const CanvasComponent = () => {
                         textAlign: 'center',
                         padding: '8px 16px',
                         borderRadius: '20px',
-                        backgroundColor: 'rgba(248, 248, 240, 0.95)',
+                        backgroundColor: 'rgba(248, 248, 240, 0.85)',
                         boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
                     }}>
                         Start Experience
