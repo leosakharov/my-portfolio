@@ -151,7 +151,7 @@ const CanvasComponent = () => {
         ctx.globalAlpha = 0.85;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'bottom';
-        ctx.fillText('continuous playground for audio and web ', 20, canvas.height - 20);
+        ctx.fillText('continuous playground for audio/web interplay', 20, canvas.height - 20);
 
         // Create audio element but don't play it yet
         const audio = new Audio(ambientAudio);
