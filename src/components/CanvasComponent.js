@@ -5,17 +5,135 @@ const CanvasComponent = () => {
     const canvasRef = useRef(null);
     const audioRef = useRef(null);
     const animationRef = useRef(null);
+    const playButtonRef = useRef(null);
+    const playCanvasRef = useRef(null);
     const [audioPlaying, setAudioPlaying] = useState(false);
-    const [audioLoaded, setAudioLoaded] = useState(false);
+    const [audioLoaded, setAudioLoaded] = useState(true); // Set to true by default to ensure play button always shows
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
     const dataArrayRef = useRef(null);
 
+    // Helper function to detect iOS devices
+    const isIOS = () => {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    };
+
+    // Function to draw the play button
+    const drawPlayButton = () => {
+        if (playCanvasRef.current) {
+            const playCanvas = playCanvasRef.current;
+            const playCtx = playCanvas.getContext('2d');
+            const size = window.innerWidth < 768 ? 100 : 120;
+            
+            // Update canvas size if needed
+            if (playCanvas.width !== size || playCanvas.height !== size) {
+                playCanvas.width = size;
+                playCanvas.height = size;
+            }
+            
+            // Clear canvas with background color
+            playCtx.fillStyle = '#f8f8f0';
+            playCtx.fillRect(0, 0, size, size);
+            
+            // Draw circle
+            playCtx.beginPath();
+            playCtx.arc(size/2, size/2, size/2 - 5, 0, Math.PI * 2);
+            playCtx.strokeStyle = '#222222';
+            playCtx.lineWidth = 2.5;
+            playCtx.globalAlpha = 0.8;
+            playCtx.stroke();
+            
+            // Draw hand-drawn play triangle icon
+            drawPlayTriangle(playCtx, size/2, size/2, size * 0.3);
+        }
+    };
+    
+    // Draw the play button on component mount and when window resizes
+    useEffect(() => {
+        // Initial draw
+        drawPlayButton();
+        
+        // Add resize handler for play button
+        const handlePlayButtonResize = () => {
+            drawPlayButton();
+        };
+        
+        // Listen for resize events
+        window.addEventListener('resize', handlePlayButtonResize);
+        
+        // Cleanup
+        return () => {
+            window.removeEventListener('resize', handlePlayButtonResize);
+        };
+    }, []);
+    
+    // Function to draw a slightly imperfect, hand-drawn play triangle icon
+    const drawPlayTriangle = (ctx, centerX, centerY, size) => {
+        // Save current context state
+        ctx.save();
+        
+        // Add a subtle jitter function for hand-drawn effect
+        const jitter = (amount) => (Math.random() - 0.5) * amount;
+        
+        // Triangle points with slight randomness
+        const leftX = centerX - size/3 + jitter(1);
+        const topY = centerY - size/2 + jitter(1);
+        const bottomY = centerY + size/2 + jitter(1);
+        const rightX = centerX + size/3 + jitter(1);
+        
+        // Draw the triangle with slightly imperfect lines
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.globalAlpha = 0.85;
+        
+        ctx.beginPath();
+        
+        // Start at top-left point
+        ctx.moveTo(leftX, topY);
+        
+        // Draw top line to right point with slight waviness
+        const topSegments = 3;
+        for (let i = 1; i <= topSegments; i++) {
+            const x = leftX + (rightX - leftX) * (i / topSegments);
+            const y = topY + (centerY - topY) * (i / topSegments) + jitter(1.5);
+            ctx.lineTo(x, y);
+        }
+        
+        // Draw right side to bottom with slight waviness
+        const rightSegments = 3;
+        for (let i = 1; i <= rightSegments; i++) {
+            const y = centerY + (bottomY - centerY) * (i / rightSegments);
+            const x = rightX - (rightX - leftX) * (i / rightSegments) + jitter(1.5);
+            ctx.lineTo(x, y);
+        }
+        
+        // Draw bottom line back to left point with slight waviness
+        const bottomSegments = 3;
+        for (let i = 1; i <= bottomSegments; i++) {
+            const x = leftX + jitter(1);
+            const y = bottomY - (bottomY - topY) * (i / bottomSegments) + jitter(1.5);
+            ctx.lineTo(x, y);
+        }
+        
+        ctx.closePath();
+        ctx.stroke();
+        
+        // Restore original context state
+        ctx.restore();
+    };
+    
     useEffect(() => {
         const canvas = canvasRef.current;
         const ctx = canvas.getContext('2d');
         canvas.width = window.innerWidth;
         canvas.height = window.innerHeight;
+        
+        // Log device info for debugging
+        console.log('Device width:', window.innerWidth);
+        console.log('Is iOS:', isIOS());
         
         // Add touch interaction variables
         let lastTouchX = null;
@@ -33,15 +151,17 @@ const CanvasComponent = () => {
         ctx.globalAlpha = 0.85;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'bottom';
-        ctx.fillText('Web and music by Leo Sakharov', 20, canvas.height - 20);
+        ctx.fillText('continuous playground for audio and web ', 20, canvas.height - 20);
 
         // Create audio element but don't play it yet
         const audio = new Audio(ambientAudio);
+        audio.preload = 'auto'; // Force preloading
         audioRef.current = audio;
         
-        // Just mark when audio is loaded
+        // Mark when audio is loaded, but we already set audioLoaded to true by default
+        // This is just for tracking purposes now
         audio.addEventListener('canplaythrough', () => {
-            setAudioLoaded(true);
+            console.log('Audio loaded and ready to play');
         }, { once: true });
 
         // Set up initial parameters
@@ -69,15 +189,7 @@ const CanvasComponent = () => {
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.globalAlpha = 0.8;
-            
-            // Add signature in bottom left corner after resize with responsive font size
-            const isMobile = window.innerWidth < 768;
-            ctx.font = `${isMobile ? '12px' : '14px'} "Diatype Variable", sans-serif`;
-            ctx.fillStyle = '#222222';
-            ctx.globalAlpha = 0.85;
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText('Web and music by Leo Sakharov', 20, canvas.height - 20);
+          
         };
 
         // Handle touch events for mobile interaction
@@ -152,27 +264,97 @@ const CanvasComponent = () => {
         const audio = audioRef.current;
         if (!audio) return;
         
-        // Create audio context after user interaction
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        audioContextRef.current = audioContext;
-        const analyser = audioContext.createAnalyser();
-        analyserRef.current = analyser;
-        const source = audioContext.createMediaElementSource(audio);
-        source.connect(analyser);
-        analyser.connect(audioContext.destination);
-        // Use a smaller FFT size on mobile for better performance
-        const isMobile = window.innerWidth < 768;
-        analyser.fftSize = isMobile ? 512 : 1024;
-        const bufferLength = analyser.frequencyBinCount;
-        const dataArray = new Uint8Array(bufferLength);
-        dataArrayRef.current = dataArray;
+        // Show loading indicator or feedback if needed
+        console.log('Starting audio playback...');
         
-        // Start playing the audio
+        // Special handling for iOS devices
+        const isIOSDevice = isIOS();
+        if (isIOSDevice) {
+            console.log('iOS device detected, using special audio handling');
+            
+            // iOS requires user interaction to unlock audio
+            // We'll try to play a short silent sound first
+            const silentPlay = () => {
+                audio.play()
+                    .then(() => {
+                        audio.pause();
+                        audio.currentTime = 0;
+                        console.log('iOS audio context unlocked');
+                        setupAudioProcessing();
+                    })
+                    .catch(error => {
+                        console.error('iOS audio unlock failed:', error);
+                        // Still try to proceed anyway
+                        setupAudioProcessing();
+                    });
+            };
+            
+            silentPlay();
+        } else {
+            // Non-iOS devices can proceed normally
+            setupAudioProcessing();
+        }
+    };
+    
+    // Separate function to set up audio processing
+    const setupAudioProcessing = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        
+        try {
+            // Create audio context after user interaction
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            audioContextRef.current = audioContext;
+            
+            // Resume the audio context (needed for some browsers)
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            
+            const analyser = audioContext.createAnalyser();
+            analyserRef.current = analyser;
+            
+            // Connect the audio element to the analyser
+            const source = audioContext.createMediaElementSource(audio);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+            
+            // Use a smaller FFT size on mobile for better performance
+            const isMobile = window.innerWidth < 768;
+            analyser.fftSize = isMobile ? 512 : 1024;
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            dataArrayRef.current = dataArray;
+            
+            // Start playing the audio
+            startPlayback();
+        } catch (error) {
+            console.error('Audio context setup error:', error);
+            // Try to play anyway without visualization
+            startPlayback();
+        }
+    };
+    
+    // Function to start actual audio playback
+    const startPlayback = () => {
+        const audio = audioRef.current;
+        if (!audio) return;
+        
         audio.play().then(() => {
             setAudioPlaying(true);
             
             const canvas = canvasRef.current;
             const ctx = canvas.getContext('2d');
+            
+            // Get references to the audio analyzer and data array
+            const analyser = analyserRef.current;
+            const dataArray = dataArrayRef.current;
+            
+            // If we don't have an analyzer (fallback mode), just return after setting audioPlaying
+            if (!analyser || !dataArray) {
+                console.log('Running in fallback mode without audio visualization');
+                return;
+            }
             
             // Set up a single control point for the pen-like drawing
             let penPosition = {
@@ -183,10 +365,10 @@ const CanvasComponent = () => {
             };
             
             // Function to get average amplitude in a frequency range
-            function getAverageAmplitude(dataArray, startBin, endBin) {
+            function getAverageAmplitude(dataArr, startBin, endBin) {
                 let sum = 0;
                 for (let i = startBin; i < endBin; i++) {
-                    sum += dataArray[i];
+                    sum += dataArr[i];
                 }
                 return sum / (endBin - startBin);
             }
@@ -323,15 +505,6 @@ const CanvasComponent = () => {
                     }
                 }
                 
-                // Add signature in bottom left corner with responsive font size
-                const isMobile = window.innerWidth < 768;
-                ctx.font = `${isMobile ? '12px' : '14px'} "Diatype Variable", sans-serif`;
-                ctx.fillStyle = '#222222';
-                ctx.globalAlpha = 0.85;
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText('Web and music by Leo Sakharov', 20, canvas.height - 20);
-                
                 // Draw audio timeline in bottom right corner with responsive width
                 const isMobileTimeline = window.innerWidth < 768;
                 const timelineWidth = isMobileTimeline ? 120 : 200; // Width of timeline - smaller on mobile
@@ -392,68 +565,67 @@ const CanvasComponent = () => {
         });
     };
 
+    // Create iOS-specific styles
+    const getPlayButtonStyles = () => {
+        const baseStyles = {
+            zIndex: 1000, // Ensure it's above everything else
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            cursor: 'pointer',
+            WebkitTapHighlightColor: 'transparent',
+            transition: 'all 0.3s ease'
+        };
+        
+        // Add iOS-specific styles
+        if (isIOS()) {
+            return {
+                ...baseStyles,
+                // iOS needs these additional styles to ensure visibility
+                WebkitTransform: 'translate(-50%, -50%)', // Explicit webkit transform
+                WebkitBackfaceVisibility: 'visible', // Force visibility
+                backfaceVisibility: 'visible',
+                WebkitPerspective: 1000,
+                perspective: 1000,
+                pointerEvents: 'auto' // Ensure touch events work
+            };
+        }
+        
+        return baseStyles;
+    };
+
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%' }}>
             <canvas ref={canvasRef}></canvas>
-            {!audioPlaying && audioLoaded && (
+            {!audioPlaying && (
                 <div 
                     onClick={startAudio}
-                    style={{
-                        position: 'absolute',
-                        top: '50%',
-                        left: '50%',
-                        transform: 'translate(-50%, -50%)',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        WebkitTapHighlightColor: 'transparent',
-                        transition: 'all 0.3s ease'
-                    }}
+                    style={getPlayButtonStyles()}
                 >
-                    {/* Play button circle */}
-                    <div style={{
-                        width: window.innerWidth < 768 ? '80px' : '100px',
-                        height: window.innerWidth < 768 ? '80px' : '100px',
-                        borderRadius: '50%',
-                        backgroundColor: 'rgba(34, 34, 34, 0.9)',
-                        display: 'flex',
-                        justifyContent: 'center',
-                        alignItems: 'center',
-                        marginBottom: '15px',
-                        boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-                        transition: 'transform 0.3s ease, box-shadow 0.3s ease',
-                        transform: 'scale(1)',
-                        ':hover': {
-                            transform: 'scale(1.05)',
-                            boxShadow: '0 6px 16px rgba(0, 0, 0, 0.2)'
-                        }
-                    }}>
-                        {/* Play triangle */}
-                        <div style={{
-                            width: 0,
-                            height: 0,
-                            borderTop: window.innerWidth < 768 ? '15px solid transparent' : '20px solid transparent',
-                            borderBottom: window.innerWidth < 768 ? '15px solid transparent' : '20px solid transparent',
-                            borderLeft: window.innerWidth < 768 ? '25px solid #f8f8f0' : '32px solid #f8f8f0',
-                            marginLeft: '5px' // Offset slightly to center visually
-                        }}/>
-                    </div>
-                    
-                    {/* Text label */}
-                    <div style={{
-                        fontFamily: '"Diatype Variable", sans-serif',
-                        fontSize: window.innerWidth < 768 ? '16px' : '18px',
-                        color: '#222222',
-                        fontWeight: '500',
-                        letterSpacing: '0.5px',
-                        textAlign: 'center',
-                        padding: '8px 16px',
-                        borderRadius: '20px',
-                        backgroundColor: 'rgba(248, 248, 240, 0.85)',
-                        boxShadow: '0 2px 6px rgba(0, 0, 0, 0.1)'
-                    }}>
-                        Start Experience
+                    {/* Canvas-drawn play button */}
+                    <div 
+                        ref={playButtonRef}
+                        style={{
+                            width: window.innerWidth < 768 ? '100px' : '120px',
+                            height: window.innerWidth < 768 ? '100px' : '120px',
+                            position: 'relative',
+                            marginBottom: '15px',
+                        }}
+                    >
+                        <canvas 
+                            ref={playCanvasRef}
+                            width={window.innerWidth < 768 ? 100 : 120}
+                            height={window.innerWidth < 768 ? 100 : 120}
+                            style={{
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                            }}
+                        />
                     </div>
                 </div>
             )}
